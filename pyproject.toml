@@ -5,9 +5,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gmssl_python"
-version = "2.2.2"
+version = "2.2.3 - sm4_xts branch"
 authors = [
   { name="Zhi Guan", email="guan@pku.edu.cn" },
+  { name="Jiayu Xiao", email="lenonshaw@outlook.com"},
 ]
 description = "Python binding of the GmSSL library with ctypes"
 readme = "README.md"

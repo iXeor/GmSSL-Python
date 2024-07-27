@@ -35,7 +35,7 @@ class StateError(Exception):
 	Crypto state error
 	'''
 
-GMSSL_PYTHON_VERSION = "2.2.2"
+GMSSL_PYTHON_VERSION = "2.2.3 - sm4_xts branch"
 
 def gmssl_library_version_num():
 	return gmssl.gmssl_version_num()
@@ -252,6 +252,121 @@ class Sm4Ctr(Structure):
 		if gmssl.sm4_ctr_encrypt_finish(byref(self), outbuf, byref(outlen)) != 1:
 			raise NativeError('libgmssl inner error')
 		return outbuf[:outlen.value]
+
+'''
+===============================================================================================================
+
+Add class for SM4 - XTS
+
+*** Important !!!
+The XTS Support for SM4 has implemented after GmSSL v3.1.2, please make sure the version of the GmSSL.
+
+Structure of SM4_XTS_CTX :
+
+typedef struct {
+	SM4_KEY key1;
+	SM4_KEY key2;
+	uint8_t tweak[16];
+	size_t data_unit_size;
+	uint8_t *block;
+	size_t block_nbytes;
+} SM4_XTS_CTX;
+
+Implemented functions :
+
+###############################################################################################################
+1. __init__ :
+
+Initialize the class Sm4Xts and the context for cipher.
+
+Input : key (32 bytes in uint_8), iv (16 bytes in uint_8), data_unit_size (size_t), encrypt (bool)
+		---------------------------------------------------------------------------------------------
+		When encrypt flag equals DO_ENCRYPT, the full class will changed into encrypt mode, when not,
+		the full class will changed into decrypt mode.
+
+Output : None
+###############################################################################################################
+
+###############################################################################################################
+2. update : 
+
+Update the cipher content, and return the result.
+
+Input : data (uint8 array)
+		
+
+Output : outbuf (uint8 array)
+###############################################################################################################
+
+###############################################################################################################
+3. finish : 
+
+Finalize the cipher content update, and return the result.
+
+Input : None
+		
+
+Output : outbuf (uint8 array)
+###############################################################################################################
+
+===============================================================================================================
+'''
+
+SM4_XTS_TWEAK_SIZE = 16 
+SM4_XTS_KEY_INPUT_SIZE = 32
+
+class Sm4Xts(Structure):
+
+	_fields_ = [
+		("key1", Sm4),
+		("key2", Sm4),
+		("tweak", c_uint8 * SM4_XTS_TWEAK_SIZE),
+		("data_unit_size", c_size_t),
+		("block", POINTER(c_uint8)),
+		("block_nbytes", c_size_t)
+	]
+
+	def __init__(self, key, iv, data_unit_size, encrypt = True):
+		if gmssl.gmssl_version_num() < 30102:
+			return None
+		if len(key) != SM4_XTS_KEY_INPUT_SIZE:
+			raise ValueError('Invalid key length')
+		if len(iv) != SM4_BLOCK_SIZE:
+			raise ValueError('Invalid IV length')
+		if data_unit_size <= 0:
+			raise ValueError('Invalid data_unit_size')
+		
+		if encrypt == DO_ENCRYPT:
+			if gmssl.sm4_xts_encrypt_init(byref(self), key, iv, data_unit_size) != 1:
+				raise NativeError('libgmssl inner error')		
+		else:
+			if gmssl.sm4_xts_decrypt_init(byref(self), key, iv, data_unit_size) != 1:
+				raise NativeError('libgmssl inner error')
+			
+	def update(self, data):
+		outbuf = create_string_buffer(len(data) + SM4_BLOCK_SIZE)
+		outlen = c_size_t()
+		if self._encrypt == DO_ENCRYPT:
+			if gmssl.sm4_xts_encrypt_update(byref(self), data, c_size_t(len(data)),
+				outbuf, byref(outlen)) != 1:
+				raise NativeError('libgmssl inner error')
+		else:
+			if gmssl.sm4_xts_decrypt_update(byref(self), data, c_size_t(len(data)),
+				outbuf, byref(outlen)) != 1:
+				raise NativeError('libgmssl inner error')
+		return outbuf[0:outlen.value]
+	
+	def finish(self):
+		outbuf = create_string_buffer(SM4_BLOCK_SIZE)
+		outlen = c_size_t()
+		if self._encrypt == DO_ENCRYPT:
+			if gmssl.sm4_xts_encrypt_finish(byref(self), outbuf, byref(outlen)) != 1:
+				raise NativeError('libgmssl inner error')
+		else:
+			if gmssl.sm4_xts_decrypt_finish(byref(self), outbuf, byref(outlen)) != 1:
+				raise NativeError('libgmssl inner error')
+		return outbuf[:outlen.value]
+
 
 
 ZUC_KEY_SIZE = 16
