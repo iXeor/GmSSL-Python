@@ -368,6 +368,142 @@ class Sm4Xts(Structure):
 		return outbuf[:outlen.value]
 
 
+class Sm4CbcMac(Structure):
+
+	_fields_ = [
+		("key", Sm4),
+		("iv", c_uint8 * 16),
+		("iv_len", c_size_t)
+	]
+
+	def __init__(self, key):
+		if len(key) != SM4_KEY_SIZE:
+			raise ValueError('Invalid key length')
+		
+		gmssl.sm4_cbc_mac_init(byref(self), key)
+
+	def update(self, data, datalen):
+		gmssl.sm4_cbc_mac_update(byref(self), data, datalen)
+
+	def finish(self):
+		outbuf = create_string_buffer(SM4_BLOCK_SIZE)
+		gmssl.sm4_cbc_mac_finish(byref(self), outbuf)
+		return outbuf
+
+SM4_CBC_SM3_HMAC_KEY_SIZE = 48
+SM4_CBC_SM3_HMAC_IV_SIZE = 16
+
+class Sm4CbcSm3Hmac(Structure):
+
+	_fields_ = [
+		("enc_ctx", Sm4Cbc),
+		("mac_ctx", Sm3Hmac),
+		("mac", c_uint8 * SM3_HMAC_SIZE),
+		("maclen", c_size_t)
+	]
+
+	def __init__(self, key, iv, aad, aadlen, encrypt = True):
+		if len(key) != SM4_CBC_SM3_HMAC_KEY_SIZE:
+			raise ValueError('Invalid key length')
+		if len(iv) != SM4_CBC_SM3_HMAC_IV_SIZE:
+			raise ValueError('Invalid IV length')
+		if aadlen <= 0:
+			raise ValueError('Invalid aadlen')
+		if encrypt == DO_ENCRYPT:
+			if(gmssl.sm4_cbc_sm3_hmac_encrypt_init(byref(self), 
+											key, iv, aad, aadlen)) != 1:
+				
+				raise NativeError('libgmssl inner error')
+		else:
+			if(gmssl.sm4_cbc_sm3_hmac_decrypt_init(byref(self), 
+											key, iv, aad, aadlen)) != 1:
+				
+				raise NativeError('libgmssl inner error')
+		
+	def update(self, data):
+		outbuf = create_string_buffer(len(data) + SM4_BLOCK_SIZE)
+		outlen = c_size_t()
+		if encrypt == DO_ENCRYPT:
+
+			if(sm4_cbc_sm3_hmac_encrypt_update(byref(self), data, 
+									  c_size_t(len(data)), outbuf, outlen)) != 1:
+				raise NativeError('libgmssl inner error')
+			return outbuf[0:outlen.value]
+		else:
+			if(sm4_cbc_sm3_hmac_decrypt_update(byref(self), data, 
+									  c_size_t(len(data)), outbuf, outlen)) != 1:
+				raise NativeError('libgmssl inner error')
+			return outbuf[0:outlen.value]
+		
+	def finish(self):
+		outbuf = create_string_buffer(SM4_BLOCK_SIZE)
+		outlen = c_size_t()
+		if encrypt == DO_ENCRYPT:
+			if(sm4_cbc_sm3_hmac_encrypt_finish(byref(self), outbuf, outlen)) != 1:
+				raise NativeError('libgmssl inner error')
+		else:
+			if(sm4_cbc_sm3_hmac_decrypt_finish(byref(self), outbuf, outlen)) != 1:
+				raise NativeError('libgmssl inner error')
+
+		return outbuf[:outlen.value]
+	
+SM4_CTR_SM3_HMAC_KEY_SIZE = 48
+SM4_CTR_SM3_HMAC_IV_SIZE = 16
+
+class Sm4CtrSm3Hmac(Structure):
+
+	_fields_ = [
+		("enc_ctx", Sm4Ctr),
+		("mac_ctx", Sm3Hmac),
+		("mac", c_uint8 * SM3_HMAC_SIZE),
+		("maclen", c_size_t)
+	]
+
+	def __init__(self, key, iv, aad, aadlen, encrypt = True):
+		if len(key) != SM4_CTR_SM3_HMAC_KEY_SIZE:
+			raise ValueError('Invalid key length')
+		if len(iv) != SM4_CTR_SM3_HMAC_IV_SIZE:
+			raise ValueError('Invalid IV length')
+		if aadlen <= 0:
+			raise ValueError('Invalid aadlen')
+		if encrypt == DO_ENCRYPT:
+			if(gmssl.sm4_ctr_sm3_hmac_encrypt_init(byref(self), 
+											key, iv, aad, aadlen)) != 1:
+				
+				raise NativeError('libgmssl inner error')
+		else:
+			if(gmssl.sm4_ctr_sm3_hmac_decrypt_init(byref(self), 
+											key, iv, aad, aadlen)) != 1:
+				
+				raise NativeError('libgmssl inner error')
+		
+	def update(self, data):
+		outbuf = create_string_buffer(len(data) + SM4_BLOCK_SIZE)
+		outlen = c_size_t()
+		if encrypt == DO_ENCRYPT:
+
+			if(sm4_ctr_sm3_hmac_encrypt_update(byref(self), data, 
+									  c_size_t(len(data)), outbuf, outlen)) != 1:
+				raise NativeError('libgmssl inner error')
+			return outbuf[0:outlen.value]
+		else:
+			if(sm4_ctr_sm3_hmac_decrypt_update(byref(self), data, 
+									  c_size_t(len(data)), outbuf, outlen)) != 1:
+				raise NativeError('libgmssl inner error')
+			return outbuf[0:outlen.value]
+		
+	def finish(self):
+		outbuf = create_string_buffer(SM4_BLOCK_SIZE)
+		outlen = c_size_t()
+		if encrypt == DO_ENCRYPT:
+			if(sm4_ctr_sm3_hmac_encrypt_finish(byref(self), outbuf, outlen)) != 1:
+				raise NativeError('libgmssl inner error')
+		else:
+			if(sm4_ctr_sm3_hmac_decrypt_finish(byref(self), outbuf, outlen)) != 1:
+				raise NativeError('libgmssl inner error')
+
+		return outbuf[:outlen.value]
+
 
 ZUC_KEY_SIZE = 16
 ZUC_IV_SIZE = 16
@@ -503,7 +639,8 @@ SM2_MAX_CIPHERTEXT_SIZE = 366
 class Sm2Point(Structure):
 	_fields_ = [
 		("x", c_uint8 * 32),
-		("y", c_uint8 * 32)
+		("y", c_uint8 * 32),
+		("z", c_uint8 * 32)
 	]
 
 
@@ -537,6 +674,26 @@ class Sm2Key(Structure):
 		z = create_string_buffer(SM3_DIGEST_SIZE)
 		gmssl.sm2_compute_z(z, byref(self), c_char_p(signer_id), c_size_t(len(signer_id)))
 		return z.raw
+	
+	def set_private_key(self, private_key):
+		if gmssl.sm2_key_set_private_key(byref(self), private_key) != 1:
+			raise NativeError('libgmssl inner error')
+		self._has_private_key = True
+
+	def set_public_key(self, x, y, z):
+		public_key = Sm2Point()
+		public_key.x = x
+		public_key.y = y
+		public_key.z = z
+
+		if gmssl.sm2_key_set_public_key(byref(self), byref(public_key)) != 1:
+			raise NativeError('libgmssl inner error')
+		self._has_public_key = True
+
+	def set_public_key(self,public_key):
+		if gmssl.sm2_key_set_public_key(byref(self), byref(public_key)) != 1:
+			raise NativeError('libgmssl inner error')
+		self._has_public_key = True
 
 	def export_encrypted_private_key_info_pem(self, path, passwd):
 		if self._has_private_key == False:
